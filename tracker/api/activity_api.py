@@ -4,12 +4,14 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
 
 from tracker.models import ActivityLog
-from tracker.serializers import ActivityLogSerializer
+from tracker.serializers import ActivityLogDetailSerializer, ActivityLogListSerializer
 from tracker.services.summary_service import SummaryService
 from bugtracker.utils.logger import get_logger
 from bugtracker.utils import apilogger
+from bugtracker.utils.pagination import SetPagination
 
 logger = get_logger(__name__)
 
@@ -45,7 +47,9 @@ class ActivityLogListApiView(APIView):
 
             queryset = queryset.order_by('-created_at')
 
-            serializer = ActivityLogSerializer(queryset, many=True)
+            paginator = SetPagination()
+            paginated_qs = paginator.paginate_queryset(queryset, request)
+            serializer = ActivityLogListSerializer(paginated_qs, many=True)
 
             apilogger.info(
                 api_name=self.api_name,
@@ -55,10 +59,7 @@ class ActivityLogListApiView(APIView):
                 total_time=(datetime.now() - start_time).total_seconds()
             )
 
-            return Response(
-                data=serializer.data,
-                status=status.HTTP_200_OK
-            )
+            return paginator.get_paginated_response(serializer.data)
 
         except PermissionDenied as perm_err:
             logger.warning(f'Unauthorized access from user-{user}. Error: {perm_err}')
@@ -148,7 +149,7 @@ class ActivityLogDetailApiView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         else:
-            data = ActivityLogSerializer(activity).data
+            data = ActivityLogDetailSerializer(activity).data
             apilogger.info(
                 api_name=self.api_name,
                 message='Response generated',
