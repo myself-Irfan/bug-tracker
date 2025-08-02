@@ -16,7 +16,7 @@ A Django-based bug tracking system with real-time WebSocket notifications.
 ## Setup Instructions
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.12
 - Redis server
 - Virtual environment (recommended)
 
