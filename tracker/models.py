@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import User
-from django.utils import timezone
 
 
 class Project(models.Model):
@@ -20,7 +19,6 @@ class Project(models.Model):
         verbose_name = "Project"
         verbose_name_plural = f"{verbose_name}s"
 
-    # TODO: members = models.ManyToManyField(User, blank=True, related_name='projects',help_text=_("Users who can access this project"))
     # TODO: bug count? open bug count?
 
 class Bug(models.Model):
@@ -80,3 +78,18 @@ class ActivityLog(models.Model):
         ordering = ['created_at']
         verbose_name = "ActivityLog"
         verbose_name_plural = f"{verbose_name}s"
+
+class ApiLog(models.Model):
+    class LevelChoice(models.TextChoices):
+        INFO = 'INFO', _('Info')
+        WARN = 'WARN', _('Warn')
+        ERROR = 'ERROR', _('Error')
+        FATAL = 'FATAL', _('Fatal')
+
+    api_name = models.CharField(max_length=100)
+    level = models.CharField(max_length=10, choices=LevelChoice.choices, db_index=True)
+    message = models.CharField(max_length=1000, null=True)
+    details = models.TextField()
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    total_time = models.FloatField(null=True, blank=True)

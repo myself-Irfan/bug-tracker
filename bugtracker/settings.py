@@ -83,8 +83,15 @@ ASGI_APPLICATION = 'bugtracker.asgi.application'
 # ========== Database ==========
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv("DB_NAME"),
+        'USER': os.getenv("DB_USER"),
+        'PASSWORD': os.getenv("DB_PWD"),
+        'HOST': os.getenv("DB_HOST"),
+        'PORT': os.getenv("DB_PORT"),
+        'OPTIONS': {
+            'options': '-c search_path={}'.format(os.getenv('DB_SCHEMA'))
+        },
     }
 }
 
@@ -151,6 +158,7 @@ USE_TZ = False
 
 # ========== Static Files ==========/
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
 # ========== Default Auto Field ==========

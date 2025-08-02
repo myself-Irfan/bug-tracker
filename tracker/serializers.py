@@ -63,13 +63,12 @@ class CommentSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class ActivityLogSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user = serializers.CharField(source='user.username', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
     bug_title = serializers.CharField(source='bug.title', read_only=True)
 
     class Meta:
         model = ActivityLog
         fields = [
-            'id', 'user', 'project', 'project_name', 'bug', 'bug_title',
-                 'action', 'description', 'created_at'
+            'id', 'user', 'project_name', 'bug', 'bug_title', 'action', 'description', 'created_at'
         ]

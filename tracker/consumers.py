@@ -14,7 +14,7 @@ class BugTrackerConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        has_permission = await self.check_project_permission(user, self.project_id)
+        has_permission = self.check_project_permission(user, self.project_id)
         if not has_permission:
             await self.close()
             return

@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from django.db.models import QuerySet
 from rest_framework import generics, status, filters, viewsets
 from rest_framework.decorators import api_view, permission_classes, action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound
+from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -9,13 +12,14 @@ from django.shortcuts import get_object_or_404
 from django.db import models
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-import json
+from rest_framework.views import APIView
 
 from tracker.models import Project, Bug, Comment, ActivityLog
 from tracker.serializers import ProjectSerializer, BugSerializer, CommentSerializer, ActivityLogSerializer
 from django.contrib.auth.models import User
 from bugtracker.utils.logger import get_logger
-
+from tracker.services.summary_service import SummaryService
+from bugtracker.utils import apilogger
 
 logger = get_logger(__name__)
 
@@ -354,49 +358,193 @@ class CommentViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"WebSocket notification failed: {e}")
 
-class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    read-only viewset for Activity Logs
-    """
-    serializer_class = ActivityLogSerializer
+
+class ActivityLogListApiView(APIView):
+    api_name = 'v1-activity-list'
     permission_classes = (IsAuthenticated, )
-    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
-    filterset_fields = ('action', 'project', 'bugs')
-    ordering = ['-created_at']
 
-    def get_queryset(self):
-        """
-        only return logs projects user has access to
-        :return:
-        """
-        user_projects = Project.objects.filter(
-            models.Q(owner=self.request.user) |
-            models.Q(members=self.request.user)
-        ).distinct()
-        return ActivityLog.objects.filter(project__in=user_projects)
+    def get(self, request):
+        start_time = datetime.now()
+        user = request.user
 
-@api_view(["GET"])
-@permission_classes(IsAuthenticated)
-def dashboard_stats(request):
-    """
-    get dashboard statisticss for current user
-    :param request:
-    :return:
-    """
-    user_projects = Project.objects.filter(
-        models.Q(owner=request.user) | models.Q(members=request.user)
-    ).distinct()
+        apilogger.info(
+            api_name=self.api_name,
+            message='Request received',
+            details=request.query_params.dict(),
+            user=user
+        )
 
-    bugs_in_user_projects = Bug.objects.filter(project__in=user_projects)
+        try:
+            queryset = SummaryService.get_user_activity_list(user)
 
-    stats = {
-        'total_projects': user_projects.count(),
-        'total_bugs': bugs_in_user_projects.count(),
-        'assigned_to_me': bugs_in_user_projects.filter(assigned_to=request.user).count(),
-        'created_by_me': bugs_in_user_projects.filter(created_by=request.user).count(),
-        'open_bugs': bugs_in_user_projects.filter(status=Bug.StatusChoice.OPEN).count(),
-        'in_progress_bugs': bugs_in_user_projects.filter(status=Bug.StatusChoice.IN_PROGRESS).count(),
-        'complete_bugs': bugs_in_user_projects.filter(status=Bug.StatusChoice.COMPLETE).count()
-    }
+            action = request.query_params.get('action')
+            project = request.query_params.get('project')
+            bug = request.query_params.get('bug')
 
-    return Response(data=stats, status=status.HTTP_200_OK)
+            if action:
+                queryset = queryset.filter(action=action)
+            if project:
+                queryset = queryset.filter(project__id=project)
+            if bug:
+                queryset = queryset.filter(bug__id=bug)
+
+            queryset = queryset.order_by('-created_at')
+
+            serializer = ActivityLogSerializer(queryset, many=True)
+
+            apilogger.info(
+                api_name=self.api_name,
+                message='Response generated',
+                details=serializer.data,
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+
+            return Response(
+                data=serializer.data,
+                status=status.HTTP_200_OK
+            )
+
+        except PermissionDenied as perm_err:
+            logger.warning(f'Unauthorized access from user-{user}. Error: {perm_err}')
+            apilogger.info(
+                api_name=self.api_name,
+                message='Response generated',
+                details=f'Unauthorized access from user-{user}: {perm_err}',
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                data={
+                    'detail': 'You do not have permission to access activities'
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        except Exception as e:
+            logger.error(f'Unexpected error in activity list: {e}')
+            apilogger.error(
+                api_name=self.api_name,
+                message='Response generated',
+                details=str(e),
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                data={'detail': f'Unexpected error: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class ActivityLogDetailApiView(APIView):
+    api_name = 'v1-activity-detail'
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request, pk):
+        start_time = datetime.now()
+        user = request.user
+
+        apilogger.info(
+            api_name=self.api_name,
+            message='Request received',
+            details=request.query_params.dict(),
+            user=user
+        )
+
+        try:
+            activity = SummaryService.get_user_activity(user, pk)
+        except PermissionDenied as perm_err:
+            logger.warning(f'Unauthorized access from user-{user}. Error: {perm_err}')
+            apilogger.info(
+                api_name=self.api_name,
+                message='Response generated',
+                details=f'Unauthorized access from user-{user}: {perm_err}',
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                data={
+                    'detail': 'You do not have permission to access this activity'
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except (ActivityLog.DoesNotExist, NotFound):
+            apilogger.warn(
+                api_name=self.api_name,
+                message='Response generated',
+                details=f'Activity-{pk} not found',
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                {'detail': 'Activity not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f'Unexpected error: {e}')
+            apilogger.error(
+                api_name=self.api_name,
+                message='Response generated',
+                details=e,
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                {'detail': 'Could not retrieve activity'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        else:
+            data = ActivityLogSerializer(activity).data
+            apilogger.info(
+                api_name=self.api_name,
+                message='Response generated',
+                details=data,
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                data=data,
+                status=status.HTTP_200_OK
+            )
+
+class DashboardStatsAPIView(APIView):
+    api_name = 'v1-dashboard-stats'
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        start_time = datetime.now()
+        user = request.user
+
+        apilogger.info(
+            api_name=self.api_name,
+            message='Request received',
+            details=request.query_params.dict(),
+            user=user
+        )
+
+        try:
+            stats = SummaryService().get_dashboard_stats(user)
+            apilogger.info(
+                api_name=self.api_name,
+                message='Response generated',
+                details=stats,
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                data=stats,
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            logger.error(f'Unexpected error: {e}')
+            apilogger.error(
+                api_name=self.api_name,
+                message='Response generated',
+                details=e,
+                user=user,
+                total_time=(datetime.now() - start_time).total_seconds()
+            )
+            return Response(
+                data={'detail': 'Internal Server Error'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

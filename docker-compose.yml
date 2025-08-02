@@ -4,16 +4,36 @@ services:
     command: gunicorn bugtracker.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
     volumes:
       - .:/app
+      - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=bugtracker.settings
+    network_mode: "host"
     depends_on:
       - redis
+#      - db
 
   redis:
     image: redis:7
-    ports:
-      - "6379:6379"
+    network_mode: "host"
+#    ports:
+#      - "6379:6379"
+
+#  db:
+#    image: postgres:15
+#    restart: always
+#    environment:
+#      POSTGRES_DB: bugtracker
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: 12345
+#    ports:
+#      - "5430:54322"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  static_volume:
+  postgres_data:
