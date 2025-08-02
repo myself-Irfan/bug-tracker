@@ -8,7 +8,7 @@ from rest_framework.pagination import PageNumberPagination
 
 from tracker.models import ActivityLog
 from tracker.serializers import ActivityLogDetailSerializer, ActivityLogListSerializer
-from tracker.services.summary_service import SummaryService
+from tracker.services.activity_service import ActivityService
 from bugtracker.utils.logger import get_logger
 from bugtracker.utils import apilogger
 from bugtracker.utils.pagination import SetPagination
@@ -32,7 +32,7 @@ class ActivityLogListApiView(APIView):
         )
 
         try:
-            queryset = SummaryService.get_user_activity_list(user)
+            queryset = ActivityService.get_user_activity_list(user)
 
             action = request.query_params.get('action')
             project = request.query_params.get('project')
@@ -107,7 +107,7 @@ class ActivityLogDetailApiView(APIView):
         )
 
         try:
-            activity = SummaryService.get_user_activity(user, pk)
+            activity = ActivityService.get_user_activity(user, pk)
         except PermissionDenied as perm_err:
             logger.warning(f'Unauthorized access from user-{user}. Error: {perm_err}')
             apilogger.info(
