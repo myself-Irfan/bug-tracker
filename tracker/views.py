@@ -51,10 +51,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return Response({
-                'message': 'Project list retrieved',
-                'data': serializer.data
-            })
+            paginated = self.get_paginated_response(serializer.data).data
+            paginated['message'] = "Project list retrieved"
+            return Response(paginated)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response({
