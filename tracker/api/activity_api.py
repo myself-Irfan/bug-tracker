@@ -4,7 +4,6 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import PermissionDenied
-from rest_framework.pagination import PageNumberPagination
 
 from tracker.models import ActivityLog
 from tracker.serializers import ActivityLogDetailSerializer, ActivityLogListSerializer
@@ -102,7 +101,7 @@ class ActivityLogDetailApiView(APIView):
         apilogger.info(
             api_name=self.api_name,
             message='Request received',
-            details=request.query_params.dict(),
+            details=pk,
             user=user
         )
 

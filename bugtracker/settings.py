@@ -115,8 +115,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    'DEFAULT_PAGINATION_CLASS': 'bugtracker.utils.pagination.SetPagination',
 }
 
 
@@ -163,3 +162,8 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # ========== Default Auto Field ==========
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ========== Custom ENV ==========
+DEFAULT_PAGE_NUMBER = os.getenv("DEFAULT_PAGE_NUMBER")
+MAX_PAGE_NUMBER = os.getenv("MAX_PAGE_NUMBER")

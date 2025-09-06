@@ -1,152 +1,143 @@
-```markdown
-# Bug Tracker Application
+# 🐛 BugTracker
 
-A Django-based bug tracking system with real-time WebSocket notifications.
+BugTracker is a simple bug tracking and project collaboration system built with Django and Django REST Framework. It includes real-time updates via Django Channels and Redis.
 
-## Features
+---
 
-- JWT Authentication
-- CRUD operations for Projects, Bugs, and Comments
-- Real-time notifications via WebSockets
-- Activity logging
-- Typing indicators
-- Swagger API documentation
-- User assignment and filtering
+## ⚙️ Setup Instructions
 
-## Setup Instructions
+### 1. Clone the repository
 
-### Prerequisites
-- Python 3.12
-- Redis server
-- Virtual environment (recommended)
-
-### Installation
-
-1. Create virtual environment:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+git clone https://github.com/yourusername/bugtracker.git
+cd bugtracker
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
+### 2. Create a `.env` file
+
+```ini
+SECRET_KEY=your-secret-key
+DB_NAME=bugtracker
+DB_USER=postgres
+DB_PWD=12345
+DB_HOST=localhost
+DB_PORT=5432
+DB_SCHEMA=public
+
+ACCESS_TOKEN_LIFETIME_IN_MIN=60
+REFRESH_TOKEN_LIFETIME_IN_DAYS=7
 ```
 
-3. Start Redis server:
+### 3. Build and run with Docker Compose
+
 ```bash
-redis-server
+docker-compose up --build
 ```
 
-4. Run migrations:
-```bash
-python manage.py makemigrations
-python manage.py migrate
-```
+> **Note:** Redis and Channels are configured inside Docker. Redis is used for message passing between consumers and Django via Channels.
 
-5. Create superuser:
-```bash
-python manage.py createsuperuser
-```
+---
 
-6. Run the development server:
-```bash
-python manage.py runserver
-```
+## 🌐 API Endpoints (Highlights)
 
-## API Endpoints
+### ✨ Authentication
 
-### Authentication
-- POST `/api/token/` - Get JWT token
-- POST `/api/token/refresh/` - Refresh JWT token
+* `POST /api/token/` - Get access and refresh token
+* `POST /api/token/refresh/` - Refresh token
 
-### Projects
-- GET `/api/projects/` - List projects
-- POST `/api/projects/` - Create project
-- GET `/api/projects/{id}/` - Get project details
-- PUT `/api/projects/{id}/` - Update project
-- DELETE `/api/projects/{id}/` - Delete project
+### 📆 Projects
 
-### Bugs
-- GET `/api/bugs/` - List bugs (supports filtering by status, project, priority)
-- POST `/api/bugs/` - Create bug
-- GET `/api/bugs/{id}/` - Get bug details
-- PUT `/api/bugs/{id}/` - Update bug
-- DELETE `/api/bugs/{id}/` - Delete bug
-- GET `/api/bugs/assigned/` - Get bugs assigned to current user
+* `GET /api/projects/` - List user-accessible projects (paginated)
+* `POST /api/projects/` - Create new project
 
-### Comments
-- GET `/api/bugs/{bug_id}/comments/` - List comments for a bug
-- POST `/api/bugs/{bug_id}/comments/` - Create comment
+### 🛠️ Bugs
 
-### Activity Log
-- GET `/api/projects/{project_id}/activity/` - Get project activity log
+* `GET /api/bugs/` - List bugs
+* `POST /api/bugs/` - Create bug
+* `GET /api/bugs/{id}/comments/` - Comments on a bug
 
-## WebSocket Usage
+### 🔹 Activities
 
-Connect to: `ws://localhost:8000/ws/project/{project_id}/`
+* `GET /api/v1/activity/` - List filtered activities
+* `GET /api/v1/activity/{id}` - Activity detail
 
-### Events Received:
-- `bug_notification` - When bugs are created/updated
-- `comment_notification` - When comments are added
-- `typing_indicator` - When users are typing
-- `activity_log` - Activity updates
+### 📊 Dashboard
 
-### Events to Send:
-```json
-{
-    "type": "typing_indicator",
-    "bug_id": 1,
-    "is_typing": true
+* `GET /api/v1/dashboard-stats/` - Summary stats
+
+### 📖 API Docs
+
+* Swagger: `GET /swagger/`
+* Redoc: `GET /redoc/`
+
+---
+
+## 🌌 Real-Time WebSocket Setup & Testing
+
+### Django Channels + Redis
+
+* Configured with `channels` and `channels_redis`
+* Redis must be running (handled in Docker)
+
+### ASGI Setup
+
+Ensure this is set in `settings.py`:
+
+```python
+ASGI_APPLICATION = 'bugtracker.asgi.application'
+CHANNEL_LAYERS = {
+  'default': {
+    'BACKEND': 'channels_redis.core.RedisChannelLayer',
+    'CONFIG': {
+      'hosts': [('127.0.0.1', 6379)],
+    },
+  },
 }
 ```
 
-## Testing WebSocket Events
+### Starting WebSocket Server
 
-1. Open browser console
-2. Connect to WebSocket:
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/project/1/');
-ws.onmessage = function(event) {
-    console.log('Message:', JSON.parse(event.data));
-};
+When using Docker:
+
+```bash
+docker-compose up
 ```
 
-3. Create/update bugs or add comments via API to see real-time updates
+Django runs with `gunicorn` using `uvicorn.workers.UvicornWorker` (ASGI-compatible).
 
-## API Documentation
+### Example Consumer Test
 
-- Swagger UI: http://localhost:8000/swagger/
-- ReDoc: http://localhost:8000/redoc/
+Assuming you have a WebSocket URL `ws://localhost:8000/ws/activity/`
 
-## Authentication
-
-Include JWT token in headers:
-```
-Authorization: Bearer <your_jwt_token>
-```
+```bash
+# Requires websocat: https://github.com/vi/websocat
+websocat ws://localhost:8000/ws/activity/
 ```
 
-This complete implementation includes all the requirements from the test:
+You should receive live activity logs as they happen.
 
-**Features Implemented:**
-✅ Django REST Framework with JWT authentication
-✅ Models: Project, Bug, Comment, ActivityLog
-✅ CRUD APIs for all models
-✅ WebSocket real-time notifications
-✅ Redis channel layer integration
-✅ Filtering and search capabilities
-✅ Activity logging with WebSocket streaming
-✅ Typing indicators (bonus)
-✅ Swagger/OpenAPI documentation (bonus)
+---
 
-**Key Technical Points:**
-- Uses Django Channels for WebSocket support
-- JWT token authentication for API security
-- Redis as the channel layer backend
-- Real-time notifications for bug updates and comments
-- Permission-based WebSocket rooms (project-based)
-- Activity logging for audit trail
-- Clean, modular code structure following Django best practices
+## 🔧 Development Tips
 
-The application is ready to run and demonstrates full-stack Django development with modern real-time features. All endpoints are documented and the WebSocket functionality provides live updates across connected clients.
+* Use DRF's built-in pagination via `SetPagination`
+* Use SlugRelatedField to handle relations by `username`
+* Logging and audit trails handled via `ActivityLog`
+
+---
+
+## 💡 Testing Auth
+
+```bash
+curl -X POST http://localhost:8000/api/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "testpass"}'
+```
+
+Use the returned access token in your headers:
+
+```bash
+-H "Authorization: Bearer <access_token>"
+```
+
+---
