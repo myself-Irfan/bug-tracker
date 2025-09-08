@@ -82,7 +82,7 @@ class BugTrackerConsumer(AsyncWebsocketConsumer):
         )
 
     @database_sync_to_async
-    def check_project_permission(self, user, project_id):
+    def check_project_permission(self, user, project_id) -> bool:
         try:
             project = Project.objects.get(id=project_id)
             return project.owner == user or user in project.members.all()

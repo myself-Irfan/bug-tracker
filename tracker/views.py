@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.db.models import QuerySet
+from django.utils import timezone
 from rest_framework import generics, status, filters, viewsets
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.exceptions import PermissionDenied, NotFound
@@ -14,110 +15,15 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from rest_framework.views import APIView
 
+
 from tracker.models import Project, Bug, Comment, ActivityLog
-from tracker.serializers import ProjectSerializer, BugSerializer, CommentSerializer
-from django.contrib.auth.models import User
+from tracker.serializers import BugSerializer, CommentSerializer
 from bugtracker.utils.logger import get_logger
 from tracker.services.summary_service import SummaryService
 from bugtracker.utils import apilogger
 
 logger = get_logger(__name__)
 
-
-class ProjectViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for handling Project CRUD operations with proper permissions
-    """
-    serializer_class = ProjectSerializer
-    permission_classes = (IsAuthenticated, )
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter)
-    search_fields = ['name', 'description']
-
-    def get_queryset(self) -> QuerySet:
-        return Project.objects.filter(
-            models.Q(owner=self.request.user) | models.Q(members=self.request.user)
-        ).distinct()
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-
-        if not queryset.exists():
-            logger.info(f'No project found for user-{request.user}')
-            return Response(
-                data={'message': 'No projects found', 'data': None},
-                status=status.HTTP_200_OK
-            )
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            paginated = self.get_paginated_response(serializer.data).data
-            paginated['message'] = "Project list retrieved"
-            return Response(paginated)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            'message': 'Project list retrieved',
-            'data': serializer.data
-        })
-
-    def perform_create(self, serializer) -> Response:
-        """
-        set current user as owner and log
-        :param serializer:
-        :return: None
-        """
-        project = serializer.save(owner=self.request.user)
-        ActivityLog.objects.create(
-            user=self.request.user,
-            project=project,
-            action='created',
-            description=f'Created project: {project.name}'
-        )
-        return Response(
-            data={'message': 'Project created successfully'},
-            status=status.HTTP_201_CREATED
-        )
-
-    @action(detail=True, methods=['post'])
-    def add_member(self, request) -> Response:
-        """
-        add a member to the project
-        :param request:
-        :return: Response
-        """
-        project = self.get_object()
-        if project.owner != request.user:
-            return Response(
-                data={'error': 'Only project owner can add members'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        username = request.data.get('username')
-        if not username:
-            return Response(
-                data={'error': 'Username required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            user = User.objects.get(username=username)
-            project.members.add(user)
-            ActivityLog.objects.create(
-                user=self.request.user,
-                project=project,
-                action='updated',
-                description=f'Added user-{username} to project-{project.name}'
-            )
-            return Response(
-                data={'message': f'User {username} added to project'},
-                status=status.HTTP_200_OK
-            )
-        except User.DoesNotExist:
-            return Response(
-                data={'error': 'User not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
 
 class BugViewSet(viewsets.ModelViewSet):
     """

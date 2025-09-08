@@ -24,9 +24,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_bug_count(self, obj):
         return obj.bugs.count()
 
-    def create(self, validated_data):
-        validated_data['owner'] = self.context.get('request').user
-        return super().create(validated_data)
 
 class BugSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)

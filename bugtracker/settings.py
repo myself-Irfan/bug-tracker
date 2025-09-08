@@ -57,6 +57,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    'tracker.middleware.TimingMiddleware'
 ]
 
 ROOT_URLCONF = 'bugtracker.urls'
@@ -109,6 +111,7 @@ CHANNEL_LAYERS = {
 
 # ========== REST Framework ==========
 REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'bugtracker.exceptions.exception_handler.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
@@ -116,6 +119,12 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'bugtracker.utils.pagination.SetPagination',
+    # usage ?
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
 }
 
 
